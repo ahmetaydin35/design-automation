@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Design Automation</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" href="https://cdn.autodesk.io/favicon.ico" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#2563eb",
+              secondary: "#64748b",
+              accent: "#0ea5e9",
+              dark: "#1e293b",
+              light: "#f8fafc",
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- jQuery for existing functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+    <!-- Bootstrap Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+    />
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Autodesk Viewer -->
+    <link
+      rel="stylesheet"
+      href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.css"
+      type="text/css"
+    />
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
+
+    <!-- Files for this project -->
+    <script src="/js/ApsDesignAutomation.js"></script>
+  </head>
+
+  <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <!-- Modern Header -->
+    <header
+      class="bg-white/95 backdrop-blur-sm shadow-lg border-b border-gray-200 sticky top-0 z-50"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <!-- Brand -->
+          <div class="flex items-center space-x-3">
+            <div
+              class="w-10 h-10 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center"
+            >
+              <i class="bi bi-gear-fill text-white text-xl"></i>
+            </div>
+            <h1
+              class="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"
+            >
+              Design Automation
+            </h1>
+          </div>
+
+          <!-- Navigation -->
+          <nav class="hidden md:flex items-center space-x-4">
+            <a
+              href="/viewer"
+              class="inline-flex items-center px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <i class="bi bi-eye mr-2"></i>
+              Viewer
+            </a>
+            <button
+              onclick="openConfigModal()"
+              class="inline-flex items-center px-4 py-2 bg-secondary hover:bg-secondary/90 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <i class="bi bi-gear mr-2"></i>
+              Configure
+            </button>
+          </nav>
+
+          <!-- Mobile menu button -->
+          <div class="md:hidden">
+            <button
+              onclick="toggleMobileMenu()"
+              class="p-2 rounded-lg hover:bg-gray-100"
+            >
+              <i class="bi bi-list text-2xl text-gray-600"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden md:hidden py-4 border-t">
+          <div class="flex flex-col space-y-3">
+            <a
+              href="/viewer"
+              class="inline-flex items-center px-4 py-2 bg-accent text-white rounded-lg"
+            >
+              <i class="bi bi-eye mr-2"></i>
+              Viewer
+            </a>
+            <button
+              onclick="openConfigModal()"
+              class="inline-flex items-center px-4 py-2 bg-secondary text-white rounded-lg"
+            >
+              <i class="bi bi-gear mr-2"></i>
+              Configure
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Panel - Controls -->
+        <div class="lg:col-span-1 space-y-6">
+          <!-- Design Parameters -->
+          <div
+            class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden"
+          >
+            <div class="bg-gradient-to-r from-primary to-accent p-6">
+              <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-sliders mr-3"></i>
+                Design Parameters
+              </h2>
+            </div>
+            <div class="p-6 space-y-6">
+              <!-- Width Input -->
+              <div class="space-y-2">
+                <label
+                  for="width"
+                  class="block text-sm font-semibold text-gray-700"
+                >
+                  Width
+                </label>
+                <input
+                  type="number"
+                  id="width"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+                  placeholder="Enter new width value"
+                />
+              </div>
+
+              <!-- Height Input -->
+              <div class="space-y-2">
+                <label
+                  for="height"
+                  class="block text-sm font-semibold text-gray-700"
+                >
+                  Height
+                </label>
+                <input
+                  type="number"
+                  id="height"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+                  placeholder="Enter new height value"
+                />
+              </div>
+
+              <!-- File Input -->
+              <div class="space-y-2">
+                <label
+                  for="inputFile"
+                  class="block text-sm font-semibold text-gray-700"
+                >
+                  Input File
+                </label>
+                <div class="relative">
+                  <input
+                    type="file"
+                    id="inputFile"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white hover:file:bg-primary/90"
+                  />
+                </div>
+              </div>
+
+              <!-- Activity Select -->
+              <div class="space-y-2">
+                <label
+                  for="activity"
+                  class="block text-sm font-semibold text-gray-700"
+                >
+                  Activity
+                </label>
+                <select
+                  id="activity"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+                >
+                  <option>Loading activities...</option>
+                </select>
+              </div>
+
+              <!-- Start Button -->
+              <button
+                id="startWorkitem"
+                class="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              >
+                <i class="bi bi-play-circle mr-2"></i>
+                Start Processing
+              </button>
+
+              <!-- Info Alert -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start">
+                  <i
+                    class="bi bi-info-circle text-blue-500 text-lg mr-3 mt-0.5"
+                  ></i>
+                  <div>
+                    <p class="text-sm font-medium text-blue-800">
+                      Processing Tip
+                    </p>
+                    <p class="text-sm text-blue-600 mt-1">
+                      Upload your file, set parameters, and click Start
+                      Processing to begin.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Processing Logs -->
+          <div
+            class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden"
+          >
+            <div class="bg-gradient-to-r from-secondary to-gray-600 p-4">
+              <h3 class="text-lg font-bold text-white flex items-center">
+                <i class="bi bi-terminal mr-2"></i>
+                Processing Logs
+              </h3>
+            </div>
+            <div class="p-0">
+              <pre
+                id="outputlog"
+                class="h-64 overflow-y-auto p-4 text-xs font-mono bg-gray-900 text-green-400 border-none"
+              ></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel - 3D Viewer -->
+        <div class="lg:col-span-2">
+          <div
+            class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden h-[calc(100vh-12rem)]"
+          >
+            <div class="bg-gradient-to-r from-accent to-blue-600 p-6">
+              <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-eye-fill mr-3"></i>
+                Viewer
+              </h2>
+            </div>
+            <div class="relative h-full">
+              <div
+                id="embedded-viewer"
+                class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200"
+                style="position: relative"
+              >
+                <!-- Placeholder content -->
+                <div
+                  class="absolute inset-0 flex items-center justify-center text-center"
+                >
+                  <div class="space-y-4">
+                    <div
+                      class="w-20 h-20 mx-auto bg-gradient-to-r from-accent to-primary rounded-full flex items-center justify-center"
+                    >
+                      <i class="bi bi-eye-fill text-white text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-700">Viewer</h3>
+                    <p class="text-gray-500 max-w-md">
+                      Process a file to view the 3D result here. Your model will
+                      appear in this space once processing is complete.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modern Modal -->
+    <div id="configModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+      <div
+        class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0"
+      >
+        <!-- Backdrop -->
+        <div
+          class="fixed inset-0 transition-opacity bg-black/50 backdrop-blur-sm"
+          onclick="closeConfigModal()"
+        ></div>
+
+        <!-- Modal -->
+        <div
+          class="inline-block w-full max-w-2xl p-6 my-8 text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl"
+        >
+          <!-- Header -->
+          <div
+            class="flex items-center justify-between pb-4 border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <div
+                class="w-10 h-10 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center"
+              >
+                <i class="bi bi-gear-fill text-white"></i>
+              </div>
+              <h3 class="text-xl font-bold text-gray-900">
+                Configure AppBundle & Activity
+              </h3>
+            </div>
+            <button
+              onclick="closeConfigModal()"
+              class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <i class="bi bi-x-lg text-xl"></i>
+            </button>
+          </div>
+
+          <!-- Content -->
+          <div class="py-6 space-y-6">
+            <!-- Warning -->
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div class="flex items-start">
+                <i
+                  class="bi bi-exclamation-triangle text-amber-500 text-lg mr-3 mt-0.5"
+                ></i>
+                <div>
+                  <p class="text-sm font-medium text-amber-800">
+                    Configuration Note
+                  </p>
+                  <p class="text-sm text-amber-600 mt-1">
+                    You only need to define AppBundle & Activity once. If the
+                    plugin code changed, redefine to create a new version.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Local Bundles -->
+            <div class="space-y-2">
+              <label
+                for="localBundles"
+                class="block text-sm font-semibold text-gray-700"
+              >
+                Select Local AppBundle
+              </label>
+              <select
+                id="localBundles"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+              >
+                <option>Loading bundles...</option>
+              </select>
+              <p class="text-xs text-gray-500">
+                <i class="bi bi-info-circle mr-1"></i>
+                Make sure .ZIP bundles are placed in the
+                <strong>/bundles/</strong> folder
+              </p>
+            </div>
+
+            <!-- Engines -->
+            <div class="space-y-2">
+              <label
+                for="engines"
+                class="block text-sm font-semibold text-gray-700"
+              >
+                Select Engine
+              </label>
+              <select
+                id="engines"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+              >
+                <option>Loading engines...</option>
+              </select>
+            </div>
+
+            <!-- Info -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p class="text-sm text-blue-800">
+                <i class="bi bi-lightbulb mr-2"></i>
+                The .ZIP name is used as suffix to define
+                <strong>AppBundle</strong> and <strong>Activity</strong> names.
+                Activities will have file and params input, and file output.
+              </p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex justify-between pt-6 border-t border-gray-200">
+            <button
+              id="clearAccount"
+              class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200"
+            >
+              <i class="bi bi-trash mr-2"></i>
+              Clear Account
+            </button>
+            <button
+              id="createAppBundleActivity"
+              class="px-6 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold rounded-lg transition-all duration-200"
+            >
+              <i class="bi bi-upload mr-2"></i>
+              Create/Update
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Center -->
+    <div
+      id="notificationCenter"
+      class="fixed top-4 right-4 z-50 space-y-4 max-w-md"
+    >
+      <!-- Notifications will be added here dynamically -->
+    </div>
+
+    <!-- Download History Panel -->
+    <div
+      id="downloadHistoryPanel"
+      class="fixed bottom-4 right-4 z-40 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 w-80 max-h-96 overflow-hidden hidden"
+    >
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 text-white">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold flex items-center">
+            <i class="bi bi-download mr-2"></i>
+            Download History
+          </h3>
+          <div class="flex items-center space-x-2">
+            <button
+              onclick="clearDownloadHistory()"
+              class="text-white/70 hover:text-white text-sm"
+            >
+              <i class="bi bi-trash"></i>
+            </button>
+            <button
+              onclick="toggleDownloadHistory()"
+              class="text-white/70 hover:text-white"
+            >
+              <i class="bi bi-dash-lg"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Download List -->
+      <div
+        id="downloadHistoryList"
+        class="p-4 space-y-3 max-h-80 overflow-y-auto"
+      >
+        <div class="text-center text-gray-500 text-sm py-8">
+          <i class="bi bi-download text-2xl mb-2 block"></i>
+          No downloads yet
+        </div>
+      </div>
+    </div>
+
+    <!-- Download History Toggle Button -->
+    <div id="downloadHistoryToggle" class="fixed bottom-4 right-4 z-30">
+      <button
+        onclick="toggleDownloadHistory()"
+        class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+      >
+        <i class="bi bi-download text-xl"></i>
+        <span
+          id="downloadCount"
+          class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold hidden"
+          >0</span
+        >
+      </button>
+    </div>
+
+    <!-- Viewer History Panel -->
+    <div
+      id="viewerHistoryPanel"
+      class="fixed top-32 right-4 z-40 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 w-80 max-h-96 overflow-hidden hidden"
+    >
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-emerald-600 to-blue-600 p-4 text-white">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold flex items-center">
+            <i class="bi bi-eye mr-2"></i>
+            Viewer History
+          </h3>
+          <div class="flex items-center space-x-2">
+            <button
+              onclick="clearViewerHistory()"
+              class="text-white/70 hover:text-white text-sm"
+            >
+              <i class="bi bi-trash"></i>
+            </button>
+            <button
+              onclick="toggleViewerHistory()"
+              class="text-white/70 hover:text-white"
+            >
+              <i class="bi bi-dash-lg"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Viewer List -->
+      <div
+        id="viewerHistoryList"
+        class="p-4 space-y-3 max-h-80 overflow-y-auto"
+      >
+        <div class="text-center text-gray-500 text-sm py-8">
+          <i class="bi bi-eye text-2xl mb-2 block"></i>
+          No models yet
+        </div>
+      </div>
+    </div>
+
+    <!-- Viewer History Toggle Button -->
+    <div id="viewerHistoryToggle" class="fixed top-20 right-4 z-30">
+      <button
+        onclick="toggleViewerHistory()"
+        class="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+      >
+        <i class="bi bi-eye text-xl"></i>
+        <span
+          id="viewerCount"
+          class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold hidden"
+          >0</span
+        >
+      </button>
+    </div>
+
+    <!-- JavaScript for mobile menu and modal -->
+    <script>
+      function toggleMobileMenu() {
+        const menu = document.getElementById("mobile-menu");
+        menu.classList.toggle("hidden");
+      }
+
+      function openConfigModal() {
+        document.getElementById("configModal").classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeConfigModal() {
+        document.getElementById("configModal").classList.add("hidden");
+        document.body.style.overflow = "auto";
+      }
+
+      function showProcessingCompleteNotification(data) {
+        // Show notification for processing complete
+        const viewerActions = `
+          <div class="flex gap-2">
+            <button onclick="loadModelInViewer('${
+              data.urn
+            }'); closeNotification('notification-${Date.now()}')" 
+                    class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-xs flex items-center">
+              <i class="bi bi-eye mr-1"></i>
+              Load
+            </button>
+            <button onclick="window.open('/viewer/#${
+              data.urn
+            }', '_blank'); closeNotification('notification-${Date.now()}')" 
+                    class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 text-xs flex items-center">
+              <i class="bi bi-box-arrow-up-right mr-1"></i>
+              Open
+            </button>
+          </div>
+        `;
+
+        showNotification(
+          "processing",
+          "🎉 Processing Complete!",
+          data.message || "Your 3D model is ready to view",
+          viewerActions
+        );
+      }
+
+      function showNotification(type, title, message, action) {
+        const notificationCenter =
+          document.getElementById("notificationCenter");
+        const notificationId = "notification-" + Date.now();
+
+        let bgColor, iconColor, icon;
+        if (type === "download") {
+          bgColor = "bg-green-600";
+          iconColor = "text-green-400";
+          icon = "bi-download";
+        } else if (type === "report") {
+          bgColor = "bg-amber-600";
+          iconColor = "text-amber-400";
+          icon = "bi-file-text";
+        } else if (type === "processing") {
+          bgColor = "bg-emerald-600";
+          iconColor = "text-emerald-400";
+          icon = "bi-check-circle";
+        }
+
+        const notification = document.createElement("div");
+        notification.id = notificationId;
+        notification.className =
+          "transform transition-all duration-300 translate-x-full";
+
+        notification.innerHTML = `
+          <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-w-sm">
+            <div class="${bgColor} p-4">
+              <div class="flex items-center">
+                <i class="bi ${icon} ${iconColor} text-xl mr-3"></i>
+                <h3 class="text-white font-bold">${title}</h3>
+              </div>
+            </div>
+            <div class="p-4">
+              <p class="text-gray-600 text-sm mb-4">${message}</p>
+              <div class="flex gap-3">
+                ${action}
+                <button onclick="closeNotification('${notificationId}')" 
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 text-sm">
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        notificationCenter.appendChild(notification);
+
+        // Animate in
+        setTimeout(() => {
+          notification.classList.remove("translate-x-full");
+        }, 100);
+
+        // Auto dismiss after 10 seconds
+        setTimeout(() => {
+          closeNotification(notificationId);
+        }, 10000);
+      }
+
+      function closeNotification(notificationId) {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+          notification.classList.add("translate-x-full");
+          setTimeout(() => {
+            notification.remove();
+          }, 300);
+        }
+      }
+
+      // Download History Management
+      let downloadHistory = [];
+
+      function toggleDownloadHistory() {
+        const panel = document.getElementById("downloadHistoryPanel");
+        const toggle = document.getElementById("downloadHistoryToggle");
+
+        if (panel.classList.contains("hidden")) {
+          panel.classList.remove("hidden");
+          toggle.style.display = "none";
+        } else {
+          panel.classList.add("hidden");
+          toggle.style.display = "block";
+        }
+      }
+
+      function addToDownloadHistory(url, title, type = "file") {
+        const filename = url.split("/").pop() || "download";
+        const timestamp = new Date().toLocaleString();
+
+        const downloadItem = {
+          id: Date.now(),
+          url: url,
+          filename: filename,
+          title: title,
+          type: type,
+          timestamp: timestamp,
+        };
+
+        downloadHistory.unshift(downloadItem); // Add to beginning
+        updateDownloadHistoryUI();
+        updateDownloadCount();
+      }
+
+      function updateDownloadHistoryUI() {
+        const listDiv = document.getElementById("downloadHistoryList");
+
+        if (downloadHistory.length === 0) {
+          listDiv.innerHTML = `
+            <div class="text-center text-gray-500 text-sm py-8">
+              <i class="bi bi-download text-2xl mb-2 block"></i>
+              No downloads yet
+            </div>
+          `;
+          return;
+        }
+
+        listDiv.innerHTML = downloadHistory
+          .map(
+            (item) => `
+          <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:bg-gray-100 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-medium text-sm text-gray-800">${
+                item.title
+              }</span>
+              <i class="bi ${
+                item.type === "report"
+                  ? "bi-file-text text-amber-600"
+                  : "bi-download text-green-600"
+              }"></i>
+            </div>
+            <div class="text-xs text-gray-500 mb-2">${item.timestamp}</div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-600 truncate mr-2">${
+                item.filename
+              }</span>
+              <a href="${item.url}" 
+                 download="${item.filename}"
+                 class="bg-${
+                   item.type === "report" ? "amber" : "green"
+                 }-600 hover:bg-${
+              item.type === "report" ? "amber" : "green"
+            }-700 text-white px-3 py-1 rounded text-xs transition-colors flex items-center">
+                <i class="bi bi-download mr-1"></i>
+                Download
+              </a>
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function updateDownloadCount() {
+        const countSpan = document.getElementById("downloadCount");
+        const count = downloadHistory.length;
+
+        if (count > 0) {
+          countSpan.textContent = count;
+          countSpan.classList.remove("hidden");
+        } else {
+          countSpan.classList.add("hidden");
+        }
+      }
+
+      function clearDownloadHistory() {
+        if (confirm("Are you sure you want to clear all download history?")) {
+          downloadHistory = [];
+          updateDownloadHistoryUI();
+          updateDownloadCount();
+        }
+      }
+
+      // Viewer History Management
+      let viewerHistory = [];
+
+      function toggleViewerHistory() {
+        const panel = document.getElementById("viewerHistoryPanel");
+        const toggle = document.getElementById("viewerHistoryToggle");
+
+        if (panel.classList.contains("hidden")) {
+          panel.classList.remove("hidden");
+          toggle.style.display = "none";
+        } else {
+          panel.classList.add("hidden");
+          toggle.style.display = "block";
+        }
+      }
+
+      function addToViewerHistory(urn, message) {
+        const timestamp = new Date().toLocaleString();
+
+        const viewerItem = {
+          id: Date.now(),
+          urn: urn,
+          message: message || "Processed 3D Model",
+          timestamp: timestamp,
+        };
+
+        viewerHistory.unshift(viewerItem); // Add to beginning
+        updateViewerHistoryUI();
+        updateViewerCount();
+      }
+
+      function updateViewerHistoryUI() {
+        const listDiv = document.getElementById("viewerHistoryList");
+
+        if (viewerHistory.length === 0) {
+          listDiv.innerHTML = `
+            <div class="text-center text-gray-500 text-sm py-8">
+              <i class="bi bi-eye text-2xl mb-2 block"></i>
+              No 3D models yet
+            </div>
+          `;
+          return;
+        }
+
+        listDiv.innerHTML = viewerHistory
+          .map(
+            (item) => `
+          <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:bg-gray-100 transition-colors">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-medium text-sm text-gray-800">${item.message}</span>
+              <i class="bi bi-cube text-blue-600"></i>
+            </div>
+            <div class="text-xs text-gray-500 mb-3">${item.timestamp}</div>
+            <div class="flex flex-col gap-2">
+              <button onclick="loadModelInViewer('${item.urn}')" 
+                      class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-xs transition-colors flex items-center justify-center">
+                <i class="bi bi-eye mr-2"></i>
+                Load in Embedded Viewer
+              </button>
+              <button onclick="window.open('/viewer/#${item.urn}', '_blank')" 
+                      class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-xs transition-colors flex items-center justify-center">
+                <i class="bi bi-box-arrow-up-right mr-2"></i>
+                Open in New Tab
+              </button>
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function updateViewerCount() {
+        const countSpan = document.getElementById("viewerCount");
+        const count = viewerHistory.length;
+
+        if (count > 0) {
+          countSpan.textContent = count;
+          countSpan.classList.remove("hidden");
+        } else {
+          countSpan.classList.add("hidden");
+        }
+      }
+
+      function clearViewerHistory() {
+        if (confirm("Are you sure you want to clear all viewer history?")) {
+          viewerHistory = [];
+          updateViewerHistoryUI();
+          updateViewerCount();
+        }
+      }
+
+      // Autodesk Viewer Başlatma
+      // let viewerApp = null;
+      // let currentDocument = null;
+      // let currentURN = null;
+      // function launchViewer(urn) {
+      //   const options = {
+      //     env: "AutodeskProduction",
+      //     accessToken: null, // Sunucudan alınmalı veya backend'den çekilmeli
+      //   };
+      //   Autodesk.Viewing.Initializer(options, function () {
+      //     const viewerDiv = document.getElementById("embedded-viewer");
+      //     viewerDiv.innerHTML = "";
+      //     const viewer = new Autodesk.Viewing.GuiViewer3D(viewerDiv);
+      //     viewer.start();
+      //     const documentId = "urn:" + urn;
+      //     Autodesk.Viewing.Document.load(
+      //       documentId,
+      //       function (doc) {
+      //         const defaultModel = doc.getRoot().getDefaultGeometry();
+      //         viewer.loadDocumentNode(doc, defaultModel);
+      //         currentDocument = doc;
+      //         currentURN = urn;
+      //       },
+      //       function (err) {
+      //         viewerDiv.innerHTML =
+      //           '<div class="text-red-500 p-4">Model yüklenemedi.</div>';
+      //       }
+      //     );
+      //   });
+      // }
+
+      // Viewer'a model yükle fonksiyonu (history ve notification butonları için)
+      // function loadModelInViewer(urn) {
+      //   if (!urn) return;
+      //   launchViewer(urn);
+      // }
+    </script>
+  </body>
+</html>
