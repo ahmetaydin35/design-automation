@@ -23,12 +23,45 @@ function initializeViewer() {
       function () {
         const container = document.getElementById("embedded-viewer");
         const config = {
-          extensions: ["Autodesk.DocumentBrowser"],
+          extensions: [
+            "Autodesk.DocumentBrowser",
+            "Autodesk.ViewCubeUi",
+            "Autodesk.DefaultTools.NavTools",
+            "Autodesk.ModelStructure",
+            "Autodesk.LayerManager",
+            "Autodesk.Measure",
+            "Autodesk.Section",
+            "Autodesk.Explode",
+            "Autodesk.FullScreen",
+            "Autodesk.Viewing.FusionOrbit",
+          ],
         };
         viewer = new Autodesk.Viewing.GuiViewer3D(container, config);
         viewer.start();
         viewer.setTheme("light-theme");
-        console.log("Viewer initialized successfully");
+
+        // Viewer başladığında placeholder'ı gizle
+        viewer.addEventListener(
+          Autodesk.Viewing.VIEWER_INITIALIZED,
+          function () {
+            console.log("🎛️ Viewer initialized - hiding placeholder");
+            const placeholder = document.getElementById("viewer-placeholder");
+            if (placeholder) {
+              placeholder.style.display = "none";
+            }
+          }
+        );
+
+        // Viewer başladığında fit to view yap
+        viewer.addEventListener(
+          Autodesk.Viewing.GEOMETRY_LOADED_EVENT,
+          function () {
+            console.log("🎛️ Geometry loaded - fitting to view");
+            viewer.fitToView();
+          }
+        );
+
+        console.log("Viewer initialized successfully with full toolbar");
         resolve(viewer);
       }
     );
@@ -63,7 +96,52 @@ function loadModelInViewer(urn) {
   return new Promise(function (resolve, reject) {
     function onDocumentLoadSuccess(doc) {
       console.log("Document loaded successfully");
-      resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+
+      // İlk olarak default geometry'yi dene
+      let modelToLoad = doc.getRoot().getDefaultGeometry();
+
+      // Eğer default geometry yoksa, alternative viewable ara
+      if (!modelToLoad) {
+        console.log("No default geometry found, searching for viewables...");
+        try {
+          const viewables = doc.getRoot().search({ type: "geometry" });
+          if (viewables && viewables.length > 0) {
+            modelToLoad = viewables[0];
+            console.log("Found viewable geometry:", modelToLoad);
+          } else {
+            // getChildren fonksiyonu güvenli kontrolü
+            const root = doc.getRoot();
+            if (root && typeof root.getChildren === "function") {
+              const allChildren = root.getChildren();
+              if (allChildren && allChildren.length > 0) {
+                modelToLoad = allChildren[0];
+                console.log("Using first child as viewable:", modelToLoad);
+              }
+            }
+          }
+        } catch (searchError) {
+          console.log("Search failed, trying direct access:", searchError);
+          // Son çare: document'in kendisini dene
+          modelToLoad = doc.getRoot();
+        }
+      }
+
+      if (modelToLoad) {
+        viewer
+          .loadDocumentNode(doc, modelToLoad)
+          .then(() => {
+            console.log("Model displayed in viewer successfully");
+            resolve();
+          })
+          .catch((loadError) => {
+            console.error("Failed to display model:", loadError);
+            reject(loadError);
+          });
+      } else {
+        const error = "No viewable content found in document";
+        console.error(error);
+        reject(error);
+      }
     }
     function onDocumentLoadFailure(code, message, errors) {
       console.error("Document load failed:", code, message, errors);
@@ -280,53 +358,103 @@ function startConnection(onReady) {
     // Add to download history
     addToDownloadHistory(url, "Result File", "file");
 
-    // Show notification for download
-    const downloadAction = `
-      <a href="${url}" 
-         download="${url.split("/").pop() || "download"}"
-         class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 text-sm flex items-center">
-        <i class="bi bi-download mr-2"></i>
-        Download
-      </a>
-    `;
-
-    showNotification(
-      "download",
-      "Download Ready",
-      "Your result file is ready to download",
-      downloadAction
-    );
+    // Simple notification for download
+    writeLog("Result file is ready for download");
   });
 
   connection.on("downloadReport", function (url) {
     // Add to download history
     addToDownloadHistory(url, "Processing Report", "report");
 
-    // Show notification for report
-    const reportAction = `
-      <a href="${url}" 
-         download="${url.split("/").pop() || "report"}"
-         class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors duration-200 text-sm flex items-center">
-        <i class="bi bi-file-text mr-2"></i>
-        Download
-      </a>
-    `;
-
-    showNotification(
-      "report",
-      "Report Ready",
-      "Processing report is available",
-      reportAction
-    );
+    // Simple notification for report
+    writeLog("Processing report is available");
   });
 
   connection.on("viewInViewer", function (data) {
-    // Add to viewer history
+    console.log("🚀 viewInViewer event received. URN:", data.urn);
+    writeLog("Starting auto-load...");
+
+    let attemptCount = 0;
+    const maxAttempts = 10;
+    const retryInterval = 500;
+    let isLoaded = false;
+
+    function attemptModelLoad() {
+      if (isLoaded) {
+        return;
+      }
+
+      attemptCount++;
+
+      // Basit timeout wrapper ile Promise chain'i koruyalım
+      const attemptPromise = new Promise((resolve, reject) => {
+        // Timeout safety
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Attempt timeout"));
+        }, 3000); // 3 saniye timeout
+
+        try {
+          if (!viewer || !viewer.impl) {
+            initializeViewer()
+              .then(() => {
+                return loadModelInViewer(data.urn);
+              })
+              .then(() => {
+                clearTimeout(timeoutId);
+                resolve();
+              })
+              .catch((error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              });
+          } else {
+            loadModelInViewer(data.urn)
+              .then(() => {
+                clearTimeout(timeoutId);
+                resolve();
+              })
+              .catch((error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              });
+          }
+        } catch (syncError) {
+          clearTimeout(timeoutId);
+          reject(syncError);
+        }
+      });
+
+      attemptPromise
+        .then(() => {
+          if (!isLoaded) {
+            isLoaded = true;
+            writeLog(`✅ Model loaded successfully!`);
+            console.log(
+              `🎉 Model successfully loaded on attempt ${attemptCount}`
+            );
+          }
+        })
+        .catch((error) => {
+          // Sadece console'a yaz, writeLog'a yazmaya gerek yok
+          if (attemptCount < maxAttempts && !isLoaded) {
+            setTimeout(() => {
+              attemptModelLoad();
+            }, retryInterval);
+          } else if (!isLoaded) {
+            writeLog("❌ Model could not be loaded automatically.");
+            console.log("💀 All attempts exhausted");
+          }
+        });
+    }
+
+    // İlk denemeyi hemen başlat
+    attemptModelLoad();
+
+    // Add to viewer history after successful processing
     addToViewerHistory(data.urn, data.message);
 
-    // Show small processing complete notification
-    showProcessingCompleteNotification(data);
-    console.log("Model ready for viewing. URN:", data.urn);
+    // Simple notification for model ready
+    writeLog("Model ready for viewing: " + data.message);
   });
 
   connection.on("onComplete", function (message) {
@@ -348,3 +476,91 @@ $(document).ready(function () {
       });
   }, 1000);
 });
+
+// Simple view history functions - basic style
+function addToViewerHistory(urn, message) {
+  // Create history panel if it doesn't exist
+  let historyPanel = document.getElementById("viewerHistoryPanel");
+  if (!historyPanel) {
+    historyPanel = document.createElement("div");
+    historyPanel.id = "viewerHistoryPanel";
+    historyPanel.innerHTML = `
+      <div style="position: fixed; bottom: 20px; left: 20px; width: 300px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000;">
+        <div style="background: #f5f5f5; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">
+          View History
+        </div>
+        <div id="viewerHistoryList" style="max-height: 200px; overflow-y: auto; padding: 10px;">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(historyPanel);
+  }
+
+  const historyList = document.getElementById("viewerHistoryList");
+  const timestamp = new Date().toLocaleTimeString();
+
+  const historyItem = document.createElement("div");
+  historyItem.style.cssText =
+    "margin-bottom: 10px; padding: 8px; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9;";
+  historyItem.innerHTML = `
+    <div style="font-size: 11px; color: #666; margin-bottom: 5px;">${timestamp}</div>
+    <div style="font-size: 12px; margin-bottom: 8px;">${message}</div>
+    <button onclick="viewModelAgain('${urn}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 11px; cursor: pointer;">View Again</button>
+  `;
+
+  historyList.insertBefore(historyItem, historyList.firstChild);
+
+  // Keep only last 5 items
+  while (historyList.children.length > 5) {
+    historyList.removeChild(historyList.lastChild);
+  }
+}
+
+function addToDownloadHistory(url, fileName, type) {
+  // Create download history panel if it doesn't exist
+  let downloadPanel = document.getElementById("downloadHistoryPanel");
+  if (!downloadPanel) {
+    downloadPanel = document.createElement("div");
+    downloadPanel.id = "downloadHistoryPanel";
+    downloadPanel.innerHTML = `
+      <div style="position: fixed; bottom: 20px; right: 20px; width: 300px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000;">
+        <div style="background: #f5f5f5; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">
+          Download History
+        </div>
+        <div id="downloadHistoryList" style="max-height: 200px; overflow-y: auto; padding: 10px;">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(downloadPanel);
+  }
+
+  const downloadList = document.getElementById("downloadHistoryList");
+  const timestamp = new Date().toLocaleTimeString();
+
+  const downloadItem = document.createElement("div");
+  downloadItem.style.cssText =
+    "margin-bottom: 10px; padding: 8px; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9;";
+  downloadItem.innerHTML = `
+    <div style="font-size: 11px; color: #666; margin-bottom: 5px;">${timestamp}</div>
+    <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">${fileName}</div>
+    <a href="${url}" download="${fileName}" style="background: #28a745; color: white; text-decoration: none; padding: 4px 8px; border-radius: 3px; font-size: 11px;">Download</a>
+  `;
+
+  downloadList.insertBefore(downloadItem, downloadList.firstChild);
+
+  // Keep only last 10 items
+  while (downloadList.children.length > 10) {
+    downloadList.removeChild(downloadList.lastChild);
+  }
+}
+
+function viewModelAgain(urn) {
+  writeLog("Loading previous model...");
+  loadModelInViewer(urn)
+    .then(() => {
+      writeLog("Previous model loaded successfully!");
+    })
+    .catch((error) => {
+      writeLog("Failed to load previous model: " + error.message);
+    });
+}

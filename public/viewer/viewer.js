@@ -24,12 +24,31 @@ export function initViewer(container) {
       { env: "AutodeskProduction", getAccessToken },
       function () {
         const config = {
-          extensions: ["Autodesk.DocumentBrowser"],
+          extensions: [
+            "Autodesk.DocumentBrowser",
+            "Autodesk.ViewCubeUi",
+            "Autodesk.DefaultTools.NavTools",
+            "Autodesk.ModelStructure",
+            "Autodesk.LayerManager",
+            "Autodesk.Measure",
+            "Autodesk.Section",
+            "Autodesk.Explode",
+          ],
         };
         const viewer = new Autodesk.Viewing.GuiViewer3D(container, config);
         viewer.start();
         viewer.setTheme("light-theme");
-        console.log("Viewer initialized successfully");
+
+        // Viewer başladığında fit to view yap
+        viewer.addEventListener(
+          Autodesk.Viewing.GEOMETRY_LOADED_EVENT,
+          function () {
+            console.log("🎛️ Geometry loaded - fitting to view");
+            viewer.fitToView();
+          }
+        );
+
+        console.log("Viewer initialized successfully with full toolbar");
         resolve(viewer);
       }
     );
@@ -40,7 +59,52 @@ export function loadModel(viewer, urn) {
   return new Promise(function (resolve, reject) {
     function onDocumentLoadSuccess(doc) {
       console.log("Document loaded successfully");
-      resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+
+      // İlk olarak default geometry'yi dene
+      let modelToLoad = doc.getRoot().getDefaultGeometry();
+
+      // Eğer default geometry yoksa, alternative viewable ara
+      if (!modelToLoad) {
+        console.log("No default geometry found, searching for viewables...");
+        try {
+          const viewables = doc.getRoot().search({ type: "geometry" });
+          if (viewables && viewables.length > 0) {
+            modelToLoad = viewables[0];
+            console.log("Found viewable geometry:", modelToLoad);
+          } else {
+            // getChildren fonksiyonu güvenli kontrolü
+            const root = doc.getRoot();
+            if (root && typeof root.getChildren === "function") {
+              const allChildren = root.getChildren();
+              if (allChildren && allChildren.length > 0) {
+                modelToLoad = allChildren[0];
+                console.log("Using first child as viewable:", modelToLoad);
+              }
+            }
+          }
+        } catch (searchError) {
+          console.log("Search failed, trying direct access:", searchError);
+          // Son çare: document'in kendisini dene
+          modelToLoad = doc.getRoot();
+        }
+      }
+
+      if (modelToLoad) {
+        viewer
+          .loadDocumentNode(doc, modelToLoad)
+          .then(() => {
+            console.log("Model displayed in viewer successfully");
+            resolve();
+          })
+          .catch((loadError) => {
+            console.error("Failed to display model:", loadError);
+            reject(loadError);
+          });
+      } else {
+        const error = "No viewable content found in document";
+        console.error(error);
+        reject(error);
+      }
     }
     function onDocumentLoadFailure(code, message, errors) {
       console.error("Document load failed:", code, message, errors);
